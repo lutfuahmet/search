@@ -6,7 +6,19 @@ var ratingMiniTimeout = null;
 var ajaxBoxDialog = null;
 var loginDialog = null;
 var searchResultCache = new Array();
+
+String.prototype.replaceAll = function(search, replacement) {
+  var target = this;
+  return target.replace(new RegExp(search, 'g'), replacement);
+};
+
+var sbody;
+var opened;
+var cont;
+
 $(document).ready(function () {
+
+  sbody = $("body");
 
   $(document).on("click", "a[name='search_keyword']", function () {
     $("#search input[name='search_keyword']").val($.trim($(this).text()));
@@ -83,35 +95,76 @@ $(document).ready(function () {
     }
   }
 
-
-  /* Auto-Complete Search */
-  $('#header input[name=\'search_keyword\']').on('keyup', function (event) {
-
-    var searchKeyword = this.value.trim();
-    if (searchKeyword === searchPattern) {
-      return; // no action
-    } else {
-      searchPattern = searchKeyword;
-    }
-
-    if (searchTimeout)
-      clearTimeout(searchTimeout);
-    if (searchKeyword.length >= 2) {
-
-      if (searchResultCache[searchKeyword] != null) {
-        $('.search-panel-container').show();
-        $('#search-panel-results').html(searchResultCache[searchKeyword]);
-
-      } else {
-        searchTimeout = setTimeout(function () {
-          fetchSearchResults(searchKeyword);
-        }, 500);
+  function initAutoComplete() {
+    var closeBtn = sbody.find(".close-button");
+    cont = sbody.find(".search-panel-container");
+    closeBtn.off("click").on("click",function () {
+      cont.removeClass("goster");
+    });
+    $('#header input[name=\'search_keyword\']').off('keyup');
+    sbody.find("#search-input").on("focus",function(){
+      var $this = $(this);
+      var searchKeyword = $this.val();
+      if(searchKeyword.length < 2){
+        opened = false;
+        cont.removeClass("goster");
       }
-    } else {
-      $('.search-panel-container').hide();
-    }
+    });
+    sbody.find("#search-input").off("keyup").on("keyup", function(evt) {
+      var $this = $(this);
+      var searchKeyword = $this.val();
+      if(searchKeyword.length < 2){
+        opened = false;
+        cont.removeClass("goster");
+      }
+      doSearch(searchKeyword);
+    });
+  }
 
-  });
+  function doSearch(keyword) {
+
+    //var url = 'https://www.kitapyurdu.com/search';
+    var url = 'https://search.kitapyurdu.com/';
+
+    $.ajax({
+      url: url,
+      //type: 'POST',
+      dataType: 'json',
+      data: { s: keyword },
+      timeout: 2000,
+      success: function(result) {
+        if(result){
+          AddResult(result.results);
+        }
+      },
+      error: function(xmlhttprequest, textstatus, message) {
+        fetchSearchResults(keyword);
+      },
+      done : function () {
+
+      }
+    });
+  }
+
+  function AddResult(result) {
+    if(result.length < 1) return;
+    var cont = sbody.find(".search-panel-container");
+    var fastSearch = sbody.find("#search-panel-results");
+    var out = "";
+    out += "<ul>";
+    for (var i = 0; i < result.length; i++) {
+      var item = result[i];
+      if (i > 20)break;
+      var name = item.n.replaceAll("_1_","<i>");
+      name = name.replaceAll("_2_","</i>");
+      out += "<li class='fast-type-" + item.tr + " fast-type-multi'><a href='index.php?route=product/search&filter_name=" + item.fn + "'><span class='fast-name'>" + name + "</span></a></li>";
+
+    }
+    out += "</ul>";
+    fastSearch.html(out);
+    if(!cont.hasClass("goster"))cont.addClass("goster");
+  }
+
 
   function fetchSearchResults(searchKeyword) {
     searchAjaxCall = $.ajax({
@@ -137,6 +190,9 @@ $(document).ready(function () {
       }
     });
   }
+
+  initAutoComplete();
+  checkClick();
 
 
   /* Library */
@@ -325,6 +381,14 @@ $(document).ready(function () {
   }
 
 });
+
+function checkClick() {
+  $(document).on("click",function (evt) {
+    if($(evt.target).closest(".search-panel-container").length === 0){
+      cont.removeClass("goster");
+    }
+  });
+}
 
 function showLoginDialog() {
   var url = window.location;
